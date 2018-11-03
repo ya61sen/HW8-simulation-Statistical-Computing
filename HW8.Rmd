@@ -1,0 +1,238 @@
+---
+title: "Homework 8 - STAT 5361 Statistical Computing"
+author:
+  - Sen Yang^[<sen.2.yang@uconn.edu>; M.S. student at
+    Department of Statistics, University of Connecticut.]
+date: "`r format(Sys.time(), '%d %B %Y')`"
+documentclass: article
+papersize: letter
+fontsize: 11pt
+bibliography: template.bib
+biblio-style: asa
+output:
+  bookdown::pdf_document2
+abstract: |
+    This is homework 8 for STAT 5361 - Statistical Computing.
+---
+
+
+```{r setup, echo = FALSE, message = FALSE, warning = FALSE}
+## some utility functions, see the source code for details
+source("utils_template.R")
+
+## specify the packages needed
+pkgs <- c("DT", "leaflet", "splines2", "webshot")
+need.packages(pkgs)
+
+## external data can be read in by regular functions,
+## such as read.table or load
+
+## for latex and html output
+isHtml <- knitr::is_html_output()
+isLatex <- knitr::is_latex_output()
+latex <- ifelse(isLatex, '\\LaTeX\\', 'LaTeX')
+
+## specify global chunk options
+knitr::opts_chunk$set(fig.width = 5, fig.height = 4, dpi = 300,
+                      out.width = "90%", fig.align = "center")
+
+```
+
+
+# Orstein–Uhlenbeck Process {#sec:5.3.3}
+
+## Transition Distribution
+
+SDE of Ornstein-Uhlenbeck process is
+$$\mathrm{d}r(t)=\alpha(b-r(t))\mathrm{d}t+\sigma\mathrm{d}W(t)$$
+Let $H(t)=\int_0^{t}-\alpha\mathrm{d}s=-\alpha t$. 
+By Ito's formula,
+$$\mathrm{d}(e^{\alpha t}r(t))=e^{\alpha t}\alpha b\mathrm{d}t+e^{\alpha t}\sigma\mathrm{d}W(t)$$
+That is,
+\begin {align*}
+    \int_0^{t}\mathrm{d}(e^{\alpha t}r(t)) &= \int_0^{t} e^{\alpha s}\alpha 
+    b\mathrm{d}s+\int_0^{t} e^{\alpha s}\sigma\mathrm{d}W(s) \\
+    e^{\alpha t}r(t)-e^{0}r(0) &= \alpha b\int_0^{t} e^{\alpha s}\mathrm{d}s+\sigma
+    \int_0^{t} e^{\alpha s}\mathrm{d}W(s) \\
+    r(t) &= e^{-\alpha t}r(0)+ b(1-e^{-\alpha t})+e^{-\alpha t}
+    \sigma\int_0^{t} e^{\alpha s}\mathrm{d}W(s) \\
+    e^{-\alpha\Delta}r(t) &= e^{-\alpha (t+\Delta)}r(0)+ b(e^{-\alpha\Delta}-e^{-\alpha 
+    (t+\Delta)})+e^{-\alpha (t+\Delta)} \sigma\int_0^{t} e^{\alpha s}\mathrm{d}W(s) 
+\end {align*}
+
+Since $$r(t+\Delta) = e^{-\alpha (t+\Delta)}r(0)+ b(1-e^{-\alpha (t+\Delta)})+e^{-\alpha 
+    (t+\Delta)} \sigma\int_0^{(t+\Delta)} e^{\alpha s}\mathrm{d}W(s),$$
+Then,
+\begin {align*}
+    r(t+\Delta) &= e^{-\alpha\Delta}r(t)+b(1-e^{-\alpha\Delta})+e^{-\alpha 
+    (t+\Delta)}\sigma\int_t^{(t+\Delta)} e^{\alpha s}\mathrm{d}W(s) \\
+    &= e^{-\alpha\Delta}r(t)+b(1-e^{-\alpha\Delta})+e^{-\alpha 
+    (t+\Delta)}\sigma\sqrt{\int_t^{(t+\Delta)} e^{2\alpha s}\mathrm{d}s}Z \\
+    &= e^{-\alpha\Delta}r(t)+b(1-e^{-\alpha\Delta})+e^{-\alpha
+    (t+\Delta)}\sigma\sqrt{\frac{e^{2\alpha(t+\Delta)}-e^{2\alpha}}{2\alpha}}Z \\
+    &= e^{-\alpha\Delta}r(t)+b(1-e^{-2\alpha\Delta})+\sigma\sqrt{\frac{1-e^
+    {-\alpha\Delta}}{2\alpha}}Z \\
+\end {align*}
+
+## A Random Walk for the Process
+
+The algorithm to implement a random walk construction for the process:
+
+\begin{algorithm} [H]
+\caption{Implement a random walk construction for the process}
+\begin{algorithmic} 
+\STATE Step 1: Set $r(0)=1, i=1,\Delta=1/500$.
+\STATE Step 2: Sample $Z_i\sim N(0,1) $.
+\STATE Step 3: compute $r(i)$.
+\STATE Step 4: $i=i+\Delta$.
+ \IF {$i>\frac{500-1}{1/500}=249500$}
+ \STATE Break the loop.
+ \ELSE
+ \STATE Return Step 2.
+ \ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+Realize this algorithm in R.
+```{r walk, echo=T, eval=F}
+# Orstein–Uhlenbeck Process
+alpha <- c(0.1,1,5)
+sigma <- c(0.1,0.2,0.5)
+b <- c(-5,5)
+
+## random walk
+ran_walk <- function(alpha,sigma,b,r0=1,T=500,delta=1/500) {
+  dim<-length(alpha)*length(sigma)*length(b)
+  results<-data.frame(matrix(0,(T-r0)/delta,dim*5))
+  for (i in 1:dim) {results[,i*5-1]<-rnorm(nrow(results))}
+  for (j in 1:length(alpha)) {
+    for (k in 1:length(sigma)) {
+      for (l in 1:length(b)) {
+        num <- (j-1)*6+(k-1)*2+l
+        results[,num*5-4]<-alpha[j]
+        results[,num*5-3]<-sigma[k]
+        results[,num*5-2]<-b[l]
+      }
+    }
+  }
+  ri<-data.frame(matrix(r0,1,dim))
+  for (i in 1:nrow(results)) {
+    ri<-exp(-results[i,(1:dim)*5-4]*delta)*ri[1,1:dim]+
+      results[i,(1:dim)*5-2]*(1-exp(-2*results[i,(1:dim)*5-4]*delta))+
+      results[i,(1:dim)*5-3]*sqrt((1-exp(-results[i,(1:dim)*5-4]*delta))/2/
+             results[i,(1:dim)*5-4])*results[i,(1:dim)*5-1]
+    results[i,(1:dim)*5]<-ri[1:dim]
+  }
+  results
+}
+results<-ran_walk(alpha,sigma,b)
+
+## plot
+res2<-results[,(1:dim)*5]
+res2<-cbind(col(1:nrow(results)),res2)
+library(ggplot)
+for (j in 1:length(alpha)) {
+  for (k in 1:length(sigma)) {
+    for (l in 1:length(b)) {
+      num <- (j-1)*6+(k-1)*2+l
+      ggplot() + deom_line(data=res2,aes(x=res2[,1],y=res2[,num])) + 
+        labs(x="t",y="r(t)",
+             title=expression(paste(alpha,"=",alpha[j],", ",sigma,"=",sigma[k],", b=",b[l]))) + 
+        theme(plot.title = element_text(hjust = 0.5))
+    }
+  }
+}
+```
+
+## Simulation of the Process by Euler–Maruyama method
+# Poisson Process
+## Distribution of $N(5)$
+
+Given $T>0$, $Z=\int_0^T\lambda(t)\mathrm{d}t=\int_0^T\sqrt{t}+e^{-t}\sin(2\pi t)\mathrm{d}t$.
+Calculate this integral by R,
+
+``` {r inhomo_para, echo=T}
+## Integration
+lamda_t <- function(t) {
+  lamdat<- sqrt(t) + exp(-t)*sin(2*pi*t)
+  lamdat
+}
+
+Z <- integrate(lamda_t,0,5)
+Z$value
+```
+
+Therefore, $N(5)\sim \mathrm{Poisson}(Z), where\;\;Z=7.607738.$
+
+## Function to Simulate from this Poisson Process in R
+
+Since $\lambda(t)=\sqrt{t}+e^{-t}\sin(2\pi t)\le\sqrt{t}+e^{-t}$, we choose $\lambda_0(t)=\sqrt{t}+e^{-t}$.
+Therefore,
+$$\Lambda(\tau)=\int_0^{\tau}\sqrt{t}+e^{-t}\mathrm{d}t=\frac{2}{3}\tau^{2/3}-e^{-tau}+1$$
+
+The algorithm to simulation from this Poisson process:
+\begin{algorithm} [H]
+\caption{Simulation from a Poisson process}
+\begin{algorithmic} 
+\STATE Step 1: Derive mean function $\Lambda(\tau)$ by $\Lambda(\tau)=\int_0^{\tau}\lambda(t)\mathrm{d}t$
+\STATE Step 2: Generate $S_1,S_2,...,$ from a homogeneous Poisson process with rate one
+\STATE Step 3: Let $T_i=\Lambda^{-1}(S_i), i=1,2,...$
+\STATE Step 4: Sample $U \sim Unif(0,1)$, for each $i$
+\IF {$U < \lambda(T_i)/\lambda_0(T_i)$}
+\STATE Return $T_i$
+\ELSE 
+\STATE Go to Step 3.
+\ENDIF
+\end{algorithmic}
+\end{algorithm}
+
+Build corresponding funcion in R.
+
+``` {r poi_prc, echo=T}
+## poisson process
+tau_t<-matrix(0,1,1)
+for (i in 1:1000) {
+  S<-5* runif(rpois(1,5))
+  T<-matrix(0,length(S),1)
+for (j in 1: length(S)) {
+  if (length(S)==0) next
+  lamda_f <- function(t) {
+    lamda_f <- 2/3*t^(3/2)-exp(-t)+1-S[j]
+    lamda_f
+  }
+  T[j,1]<-uniroot(lamda_f,c(0,5))$root
+  tau<-matrix(0,length(S),1)
+}
+  for (k in 1:nrow(T)) {
+    if (length(T)==0) next
+    u0 <- runif(1)
+    if (u0<=(sqrt(T[k,1])+exp(-T[k,1])*sin(2*pi*T[k,1]))/(sqrt(T[k,1])+exp(-T[k,1]))) {
+      tau[k,1]<-T[k,1]
+    }
+    else next
+  }
+  tau_t<-rbind(tau_t,tau)
+}
+tau_t<-as.data.frame(tau_t[tau_t>0 & tau_t<5])
+```
+
+## Poisson Process Simulation
+Generate events from this Poisson process 1000 times and plot the results.
+
+``` {r poi_sim, echo=T}
+true_f <- function(t) {
+  true_f<- (sqrt(t)+exp(-t)*sin(2*pi*t))/(Z$value)
+  true_f
+}
+library(ggplot2)
+ggplot() + stat_function(aes(col="true"), fun=true_f) +
+  geom_density(data=tau_t,aes(tau_t[,1], col='kernel')) + 
+  scale_color_manual(values = c("red", "blue")) +
+  labs(title = paste("kernel density vs. true density with "),
+       x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+```
+
+
+
+
+
