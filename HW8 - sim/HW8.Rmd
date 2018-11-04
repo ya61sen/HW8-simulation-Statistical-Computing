@@ -88,7 +88,7 @@ The algorithm to implement a random walk construction for the process:
  \IF {$i>\frac{500-0}{1/500}+1=250001$}
  \STATE Break the loop.
  \ELSE
- \STATE Return Step 2.
+ \STATE Go to Step 2.
  \ENDIF
 \end{algorithmic}
 \end{algorithm}
@@ -144,11 +144,76 @@ for (j in 1:length(alpha_init)) {
   }
 }
 ```
+From those 18 path plots, we can conclude that the variation of $r(t)$ goes down when $alpha$ increases and/or $sigma$ decreases.
 
 ## Simulation of the Process by Euler–Maruyama method
 
+Suppose in this simulation, $\alpha=5, \sigma=0.1, b=5$ and $r(0)=1$.
+According to part (a), the ture density for $r(t)$ is
+\begin {align*}
+  r(t) &= e^{-\alpha t}r(0)+ b(1-e^{-\alpha t})+
+  e^{-\alpha t}\sigma \int_0^{t} e^{\alpha s}\mathrm{d}W(s) \\
+    &= e^{-\alpha t}r(0)+ b(1-e^{-\alpha t})+
+  e^{-\alpha t}\sigma \sqrt{\int_0^{t} e^{2\alpha s}\mathrm{d}s}Z \\
+    &= e^{-\alpha t}r(0)+ b(1-e^{-\alpha t})
+    +\sigma \sqrt{\frac{1-e^{-2\alpha t}}{2\alpha} }Z \\
+    &\sim N(e^{-\alpha t}r(0)+ b(1-e^{-\alpha t}),\sigma^2\frac{1-e^{-2\alpha t}}{2\alpha})
+\end {align*}
+Therefore, $r(1)\sim N(5-4e^{-5},\frac{1-e^{-10}}{1000})$.
 
+According to Euler–Maruyama method, we can generate a sample of size 1000 for $r(1)$ by
+$$r(t+\delta)\sim N(r(t)+\alpha(b-r(t))\delta, \sigma\delta).$$
+Simulate in R and generate a sample for each $\delta$.
 
+```{r e-m, echo=T}
+## Euler–Maruyama method
+deltas <- c(1,0.5,0.1,0.01)
+
+em_mthd <- function(delta, N, r0=1, alpha=5, sigma=0.1, b=5) {
+  sample_N <- NULL
+  for (j in 1:N) {
+    rt<-numeric(1/delta+1);rt[1]<-r0;r_nrml<-rnorm(1/delta)
+    for (i in 2:length(rt)) {
+      mu<-rt[i-1]+alpha*(b-rt[i-1])*delta
+      sd<-sigma*delta
+      rt[i]<-mu+sd*r_nrml[i-1]
+    }
+    sample_N<-data.frame(rbind(sample_N,rt[length(rt)]))
+  }
+  sample_N
+}
+
+sample_1000 <- data.frame(matrix(0,1000,length(deltas)))
+for (i in 1: length(deltas)) {
+  sample_1000[,i] <- em_mthd(deltas[i],1000)
+}
+
+true_f <- function(x) {
+  dnorm(x,(5-4*exp(-5)),sqrt((1-exp(-10))/1000))
+}
+library(ggplot2)
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+    geom_density(data=sample_1000,aes(sample_1000[,1], col='kernel')) + 
+    scale_color_manual(values = c("red", "blue")) + 
+    xlim(4,24) + labs(title = paste("delta =",deltas[1]),
+         x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+  geom_density(data=sample_1000,aes(sample_1000[,2], col='kernel')) + 
+  scale_color_manual(values = c("red", "blue")) + 
+  xlim(-5,6) + labs(title = paste("delta =",deltas[2]),
+                    x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+  geom_density(data=sample_1000,aes(sample_1000[,3], col='kernel')) + 
+  scale_color_manual(values = c("red", "blue")) + 
+  xlim(4,6) + labs(title = paste("delta =",deltas[3]),
+                    x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+  geom_density(data=sample_1000,aes(sample_1000[,4], col='kernel')) + 
+  scale_color_manual(values = c("red", "blue")) + 
+  xlim(4,6) + labs(title = paste("delta =",deltas[4]),
+                    x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+```
+    
 # Poisson Process
 
 ## Distribution of $N(5)$
@@ -240,7 +305,7 @@ library(ggplot2)
 ggplot() + stat_function(aes(col="true"), fun=true_f) +
   geom_density(data=tau_t,aes(tau_t[,1], col='kernel')) + 
   scale_color_manual(values = c("red", "blue")) + xlim(0,5) +
-  labs(title = paste("kernel density vs. theoretical density"),
+  labs(title = paste("kernel density vs. true density"),
        x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
 ```
 
