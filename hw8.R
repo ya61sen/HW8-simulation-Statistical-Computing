@@ -48,7 +48,51 @@ for (j in 1:length(alpha_init)) {
 }
 
 ## Euler–Maruyama method
+deltas <- c(1,0.5,0.1,0.01)
 
+em_mthd <- function(delta, N, r0=1, alpha=5, sigma=0.1, b=5) {
+  sample_N <- NULL
+  for (j in 1:N) {
+    rt<-numeric(1/delta+1);rt[1]<-r0;r_nrml<-rnorm(1/delta)
+    for (i in 2:length(rt)) {
+      mu<-rt[i-1]+alpha*(b-rt[i-1])*delta
+      sd<-sigma*delta
+      rt[i]<-mu+sd*r_nrml[i-1]
+    }
+    sample_N<-data.frame(rbind(sample_N,rt[length(rt)]))
+  }
+  sample_N
+}
+
+sample_1000 <- data.frame(matrix(0,1000,length(deltas)))
+for (i in 1: length(deltas)) {
+  sample_1000[,i] <- em_mthd(deltas[i],1000)
+}
+
+true_f <- function(x) {
+  dnorm(x,(5-4*exp(-5)),sqrt((1-exp(-10))/1000))
+}
+library(ggplot2)
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+    geom_density(data=sample_1000,aes(sample_1000[,1], col='kernel')) + 
+    scale_color_manual(values = c("red", "blue")) + 
+    xlim(4,24) + labs(title = paste("delta =",deltas[1]),
+         x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+  geom_density(data=sample_1000,aes(sample_1000[,2], col='kernel')) + 
+  scale_color_manual(values = c("red", "blue")) + 
+  xlim(-5,6) + labs(title = paste("delta =",deltas[2]),
+                    x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+  geom_density(data=sample_1000,aes(sample_1000[,3], col='kernel')) + 
+  scale_color_manual(values = c("red", "blue")) + 
+  xlim(4,6) + labs(title = paste("delta =",deltas[3]),
+                    x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
+ggplot()+ stat_function(aes(col="true"),fun=true_f)+
+  geom_density(data=sample_1000,aes(sample_1000[,4], col='kernel')) + 
+  scale_color_manual(values = c("red", "blue")) + 
+  xlim(4,6) + labs(title = paste("delta =",deltas[4]),
+                    x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
 
 # Poisson Process
 
@@ -100,6 +144,6 @@ library(ggplot2)
 ggplot() + stat_function(aes(col="true"), fun=true_f) +
   geom_density(data=tau_t,aes(tau_t[,1], col='kernel')) + 
   scale_color_manual(values = c("red", "blue")) + xlim(0,5) +
-  labs(title = paste("kernel density vs. theoretical density"),
+  labs(title = paste("kernel density vs. true density"),
        x = "t", y = "value") + theme(plot.title = element_text(hjust = 0.5))
 
