@@ -144,7 +144,7 @@ for (j in 1:length(alpha_init)) {
   }
 }
 ```
-From those 18 path plots, we can conclude that the variation of $r(t)$ goes down when $alpha$ increases and/or $sigma$ decreases. Meanwhile, there is a larger difference between two consecutive $r(t)$s when we choose a larger $alpha$, that is, a more stable path will show regarding to the plot.
+From those 18 path plots, we can conclude that the variation of $r(t)$ goes down when $\alpha$ increases and/or $\sigma$ decreases. Meanwhile, there is a larger difference between two consecutive $r(t)$s when we choose a larger $\alpha$, that is, a more stable path will show regarding to the plot.
 
 ## Simulation of the Process by Euler–Maruyama method
 
